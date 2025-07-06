@@ -5,7 +5,7 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
-# .env ফাইল থেকে ভেরিয়েবল লোড করুন
+# .env ফাইল থেকে এনভায়রনমেন্ট ভেরিয়েবল লোড করুন
 load_dotenv()
 
 # --- Configuration ---
@@ -133,17 +133,36 @@ async def handle_movie_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
         await processing_message.edit_text(text=f"❌ Failed to add to database: {e}")
         print(f"Database insertion failed: {e}")
 
-async def main():
+async def main() -> None:
+    """Start the bot and keep it running."""
     print("Starting bot...")
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
+    # অ্যাপ্লিকেশন তৈরি করুন
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+    # হ্যান্ডলার যোগ করুন
     application.add_handler(MessageHandler(
         (filters.VIDEO | filters.Document.ALL) & filters.ChatType.CHANNEL,
         handle_movie_upload
     ))
     
+    # অ্যাপ্লিকেশনটি চালু করুন এবং পোলিং শুরু করুন
+    # এই পদ্ধতিটি Render এর মতো পরিবেশে asyncio লুপ সম্পর্কিত ত্রুটি এড়ায়
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    
     print(f"Bot is listening for new files in channel ID: {ALLOWED_CHANNEL_ID}...")
-    await application.run_polling()
+    
+    # বটটিকে চলতে দিন যতক্ষণ না পর্যন্ত আপনি এটিকে বন্ধ করছেন (যেমন Ctrl+C দিয়ে)
+    # এটি main() ফাংশনটিকে শেষ হওয়া থেকে বিরত রাখে এবং RuntimeError প্রতিরোধ করে
+    while True:
+        await asyncio.sleep(3600) # প্রতি ঘন্টায় একবার ঘুমাবে, রিসোর্স বাঁচানোর জন্য
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot is shutting down...")
+    except Exception as e:
+        print(f"An error occurred: {e}")
